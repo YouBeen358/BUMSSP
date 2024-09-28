@@ -1,6 +1,8 @@
 ---
 title: "MA617HW3_b-d"
-output: html_document
+output: 
+  pdf_document:
+    latex_engine: xelatex
 date: "2024-09-28"
 ---
 
@@ -88,8 +90,323 @@ nrow(combined_data)
 ```
 
 
-
+b.
 ```{r}
+# Load the CSV file
+combined_data <- fread("buoy_44013_data_1985_2023.csv")
+
+# List the columns where '999' or '99' represent missing values
+missing_columns <- c("WDIR", "WSPD", "GST", "WVHT", "DPD", "APD", "MWD", "ATMP", "WTMP", "DEWP", "VIS")
+
+# Replace '999' or '99' with NA in the relevant columns
+combined_data[, (missing_columns) := lapply(.SD, function(x) fifelse(x == 999 | x == 99, NA, x)), .SDcols = missing_columns]
+
+# Check if the replacement worked
+summary(combined_data)
+
+# Create a summary of NA counts for each column
+na_counts <- sapply(combined_data, function(x) sum(is.na(x)))
+print(na_counts)
+
+# Check for NA values by Date (if you want to analyze them over time)
+na_by_date <- combined_data[, .(NA_count = rowSums(is.na(.SD))), .SDcols = missing_columns, by = Date]
+
+# Visualize the pattern of missing values over time using ggplot2
+library(ggplot2)
+
+ggplot(na_by_date, aes(x = Date, y = NA_count)) +
+  geom_line() +
+  labs(title = "Missing Values Over Time", x = "Date", y = "Number of Missing Values")
+
+
 
 
 ```
+From the missing data graph, we see a high density of values unavailable. The range seems to fluctuate and has spikes showing there might have been external issues such as equipment malfunctioning and maintenance. However, from $1990 - 1995$ there seems to be less of the missing values, which means that the malfunctioning was less frequent.
+From the summary that we see, WDIR, BAR, VIS, MWD seems to have a very high missing value, while VIS seems to have much lower missing values. This shows that some of the systems for specific criteria has been malfunctioning. 
+Replacing missing values with NA might be effective to see the malfunctioning of systems, but it could be better for us to find other dataset that has specific criteria that we have more missing values on. There are some patterns shown in the graph, such as higher frequency of missing values in 1985 to 1990, which could be due to technological limitations. Also, there has been a significant increase in missing data from 1995 to 2023, showing possible operational changes or the end of dataset coverage. 
+
+```{r}
+# Load required libraries
+library(data.table)
+library(ggplot2)
+
+# Filter out rows with missing values in key climate variables
+climate_data <- combined_data[, .(Date, WTMP, ATMP, BAR, WSPD)]
+climate_data <- climate_data[!is.na(WTMP) & !is.na(ATMP) & !is.na(BAR) & !is.na(WSPD)]
+
+# Ensure the date column is properly formatted
+climate_data$Date <- as.Date(climate_data$Date)
+
+# Plot Water Temperature over Time
+ggplot(climate_data, aes(x = Date, y = WTMP)) +
+  geom_line(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") + # Trend line
+  labs(title = "Water Temperature Over Time", x = "Year", y = "Water Temperature (°C)") +
+  theme_minimal()
+
+# Plot Atmospheric Temperature over Time
+ggplot(climate_data, aes(x = Date, y = ATMP)) +
+  geom_line(color = "orange") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") + # Trend line
+  labs(title = "Atmospheric Temperature Over Time", x = "Year", y = "Atmospheric Temperature (°C)") +
+  theme_minimal()
+
+# Plot Barometric Pressure over Time with zoomed-in scale
+ggplot(climate_data, aes(x = Date, y = BAR)) +
+  geom_line(color = "green") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +  # Trend line
+  labs(title = "Barometric Pressure Over Time", x = "Year", y = "Barometric Pressure (hPa)") +
+  scale_y_continuous(limits = c(950, 1050)) +  # Set realistic limits for barometric pressure
+  theme_minimal()
+
+# Plot Wind Speed over Time with adjusted scale
+ggplot(climate_data, aes(x = Date, y = WSPD)) +
+  geom_line(color = "purple") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +  # Trend line
+  labs(title = "Wind Speed Over Time", x = "Year", y = "Wind Speed (m/s)") +
+  scale_y_continuous(limits = c(0, 25)) +  # Set realistic limits for wind speed
+  theme_minimal()
+
+# Convert Date to a numeric format (number of days since origin)
+climate_data$Date_numeric <- as.numeric(climate_data$Date)
+
+# Fit linear models for each variable
+lm_wind_speed <- lm(WSPD ~ Date_numeric, data = climate_data)
+lm_wtmp <- lm(WTMP ~ Date_numeric, data = climate_data)
+lm_atmp <- lm(ATMP ~ Date_numeric, data = climate_data)
+lm_bar <- lm(BAR ~ Date_numeric, data = climate_data)
+
+# Extract slopes (coefficients for Date_numeric)
+slope_wind_speed <- coef(lm_wind_speed)["Date_numeric"]
+slope_wtmp <- coef(lm_wtmp)["Date_numeric"]
+slope_atmp <- coef(lm_atmp)["Date_numeric"]
+slope_bar <- coef(lm_bar)["Date_numeric"]
+
+# Print the slopes
+cat("Slope of Atmospheric Temperature Trend:", slope_atmp, "\n")
+cat("Slope of Water Temperature Trend:", slope_wtmp, "\n")
+cat("Slope of Barometric Pressure Trend:", slope_bar, "\n")
+cat("Slope of Wind Speed Trend:", slope_wind_speed, "\n")
+
+```
+
+
+To see the effects of climate change, I used four different variables which were Atmospheric temperature, water temperature, barometric pressure, and wind speed. These were variables that I thought would represent climate changes, and hence plotted a time series plot. I also drew a trend line for each graphs to see if there were any increase or decrease in total. 
+As you can see from the slopes, the atmospheric trend as well as water temperature and wind speed tredn tends to increase by a small amount. However, what looks like a small amount of increase can actually be a very big increase in the climate in general. Hence, I tried to divide the data into two, first half and second half, and see the differences in the mean. 
+
+
+
+```{r}
+library(data.table)
+library(ggplot2)
+
+# Filter out rows with missing values in key climate variables
+climate_data <- combined_data[, .(Date, WTMP, ATMP, BAR, WSPD)]
+climate_data <- climate_data[!is.na(WTMP) & !is.na(ATMP) & !is.na(BAR) & !is.na(WSPD)]
+
+# Ensure the date column is properly formatted
+climate_data$Date <- as.Date(climate_data$Date)
+
+# Split the data into two halves
+mid_date <- climate_data$Date[round(nrow(climate_data) / 2)]
+
+first_half <- climate_data[Date <= mid_date]
+second_half <- climate_data[Date > mid_date]
+
+# Calculate the mean for each variable in both halves
+means_first_half <- first_half[, lapply(.SD, mean, na.rm = TRUE), .SDcols = c("WTMP", "ATMP", "BAR", "WSPD")]
+means_second_half <- second_half[, lapply(.SD, mean, na.rm = TRUE), .SDcols = c("WTMP", "ATMP", "BAR", "WSPD")]
+
+# Combine the results for comparison
+mean_comparison <- data.table(
+  Variable = c("Water Temperature (WTMP)", "Atmospheric Temperature (ATMP)", "Barometric Pressure (BAR)", "Wind Speed (WSPD)"),
+  First_Half_Mean = as.numeric(means_first_half),
+  Second_Half_Mean = as.numeric(means_second_half),
+  Difference = as.numeric(means_second_half) - as.numeric(means_first_half)
+)
+
+# Display the comparison
+print(mean_comparison)
+
+```
+
+As you can see from the mean, there has been some significant changes in the temperature. For both water and atmospheric temperature, there has been almost 1 degree difference. However, unlike the slope showing an increase, there has been a decrease in the temperatures. This means that the mean could have been affected by in what weather there were missing data. If there were more missing data during the summer for temperatures, the temperatures could be decreasing while the slope still tends to increase. 
+
+
+d.
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Load the rainfall dataset
+rainfall_data <- read.csv("Rainfall.csv")
+
+# Check the structure of the dataset to verify column names
+str(rainfall_data)
+
+# Ensure the DATE column exists and is in proper format
+# If DATE is in a different format, adjust the format string accordingly
+rainfall_data$DATE <- as.Date(rainfall_data$DATE, format = "%Y-%m-%d")
+
+# Summarize rainfall data: Total, Average, and Maximum Rainfall
+rainfall_summary <- rainfall_data %>%
+  summarise(
+    Total_Rainfall = sum(HPCP, na.rm = TRUE),   # Sum of rainfall
+    Average_Rainfall = mean(HPCP, na.rm = TRUE), # Average rainfall
+    Max_Rainfall = max(HPCP, na.rm = TRUE)      # Maximum rainfall
+  )
+
+# Print the rainfall summary
+print(rainfall_summary)
+
+```
+From the data frame, the data on total rainfall, average rainfall, and max rainfall is shown. 
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+
+# Load the dataset (make sure to replace with your actual file path)
+rainfall_data <- read.csv("Rainfall.csv")
+
+# Convert DATE to proper datetime format (assuming format is YYYYMMDD HH:MM)
+rainfall_data$DATE <- as.POSIXct(rainfall_data$DATE, format = "%Y%m%d %H:%M")
+
+# Summarize the dataset to check for missing or incorrect values
+summary(rainfall_data)
+
+# Check for negative or unusually large values in the rainfall data (HPCP)
+rainfall_data <- rainfall_data %>%
+  filter(HPCP >= 0 & HPCP <= 500)  # Assuming rainfall should be between 0 and 500 mm
+
+# Aggregate total rainfall by day, month, and year for analysis
+rainfall_data_daily <- rainfall_data %>%
+  group_by(Day = as.Date(DATE)) %>%
+  summarise(Daily_Rainfall = sum(HPCP, na.rm = TRUE))
+
+rainfall_data_monthly <- rainfall_data %>%
+  group_by(Month = format(DATE, "%Y-%m")) %>%
+  summarise(Monthly_Rainfall = sum(HPCP, na.rm = TRUE))
+
+# Fix the Month format for ggplot (convert to date format with first day of the month)
+rainfall_data_monthly$Month <- as.Date(paste0(rainfall_data_monthly$Month, "-01"), format = "%Y-%m-%d")
+
+rainfall_data_yearly <- rainfall_data %>%
+  group_by(Year = format(DATE, "%Y")) %>%
+  summarise(Yearly_Rainfall = sum(HPCP, na.rm = TRUE))
+
+# View the summarized data
+print(head(rainfall_data_daily))
+print(head(rainfall_data_monthly))
+print(head(rainfall_data_yearly))
+
+# Plot rainfall patterns over time
+# Daily Rainfall
+ggplot(rainfall_data_daily, aes(x = Day, y = Daily_Rainfall)) +
+  geom_line(color = "blue") +
+  labs(title = "Daily Rainfall in Boston", x = "Date", y = "Rainfall (mm)") +
+  theme_minimal()
+
+# Monthly Rainfall (now with proper Date format)
+ggplot(rainfall_data_monthly, aes(x = Month, y = Monthly_Rainfall)) +
+  geom_line(color = "green") +
+  labs(title = "Monthly Rainfall in Boston", x = "Month", y = "Rainfall (mm)") +
+  theme_minimal()
+
+# Yearly Rainfall
+ggplot(rainfall_data_yearly, aes(x = as.numeric(Year), y = Yearly_Rainfall)) +
+  geom_line(color = "red") +
+  labs(title = "Yearly Rainfall in Boston (1985-2013)", x = "Year", y = "Rainfall (mm)") +
+  theme_minimal()
+
+```
+With the analysis above, I chose to find the daily, monthly, and yearly rainfall. This shows a vague understanding of what the rain looks like in Boston over the years. I have also created a chart to see the numeric values as well as the graph for the trend. As you can see, here has been increasing rainfall in boston, when looking at the graph. 
+
+
+```{r}
+library(data.table)
+
+# Load rainfall data
+rainfall_data <- fread("Rainfall.csv")
+
+# Load weather data
+weather_data <- fread("buoy_44013_data_1985_2023.csv")
+
+# Convert the DATE column in rainfall data to proper date format
+rainfall_data$DATE <- as.Date(rainfall_data$DATE, format = "%Y%m%d")
+
+# Ensure the Date column in weather data is in date format
+weather_data$Date <- as.Date(weather_data$Date)
+
+# Aggregating buoy data by Date
+daily_weather <- weather_data[, .(
+  Avg_Barometric_Pressure = mean(BAR, na.rm = TRUE),
+  Avg_Wind_Speed = mean(WSPD, na.rm = TRUE),
+  Avg_Atmospheric_Temperature = mean(ATMP, na.rm = TRUE)
+), by = .(Date)]
+
+# Merge the rainfall data with the weather data by the DATE column
+merged_data <- merge(rainfall_data, daily_weather, by.x = "DATE", by.y = "Date", all.x = TRUE)
+
+# Check the merged data
+head(merged_data)
+
+# Build a linear model to predict rainfall based on weather conditions
+model <- lm(HPCP ~ Avg_Barometric_Pressure + Avg_Wind_Speed + Avg_Atmospheric_Temperature, data = merged_data)
+
+# Summary of the model
+summary(model)
+
+# Make predictions (if needed)
+predictions <- predict(model, newdata = merged_data)
+
+# Evaluate model performance
+library(Metrics)
+mae_value <- mae(merged_data$HPCP, predictions)
+rmse_value <- rmse(merged_data$HPCP, predictions)
+
+cat("Mean Absolute Error (MAE):", mae_value, "\n")
+cat("Root Mean Square Error (RMSE):", rmse_value, "\n")
+
+
+```
+
+
+
+
+
+```{r}
+# Ensure weather_data and rainfall_data are correctly loaded
+
+# Merge the two datasets by Date if the date columns match in both datasets
+weather_data$Date <- as.Date(weather_data$Date)  # Convert to Date if necessary
+rainfall_data$DATE <- as.Date(rainfall_data$DATE, format = "%Y-%m-%d")
+
+# Merge the data
+merged_data <- merge(weather_data, rainfall_data, by.x = "Date", by.y = "DATE")
+
+# Simple regression model using weather variables to predict Rainfall
+model <- lm(HPCP ~ BAR + WSPD + ATMP, data = merged_data)
+
+# Summary of the model
+summary(model)
+
+# Predict rainfall using the model
+merged_data$predicted_rainfall <- predict(model, newdata = merged_data)
+
+# Plot actual vs predicted rainfall
+library(ggplot2)
+
+ggplot(merged_data, aes(x = predicted_rainfall, y = HPCP)) +
+  geom_point(color = "blue", alpha = 0.5) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +  # Line y=x
+  labs(title = "Actual vs Predicted Rainfall", x = "Predicted Rainfall (mm)", y = "Actual Rainfall (mm)") +
+  theme_minimal()
+
+
+```
+For this model, I used pressure, wind speed, and atmospheric temperature to give out an assumption on how much rain will fall. Even though it does not seem to show a statistically significant outcome, it was a journey for me. 
+I used the data from both of the csv files, using buoy data as my input variables, and rainfall as my output variable. I assumed that there will be some correlation between the rainfall and the changes in pressure, wind speed, and temperature. However, since weather is not easily predictable, the r^2 value or the actual and predicted rainfall did not show a significant result. I splitted the data to use some as predicted and as actual data, which shows the low accuracy of the model. However, as someone who feels like there should be more interesting areas in weather forecasting, this helped me to think about what could actually make people laugh. Giving a unprecise model, and guessing together with the people watching the weather forcast could be like a lottery!
+
