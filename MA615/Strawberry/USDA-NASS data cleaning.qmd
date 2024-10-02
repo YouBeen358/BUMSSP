@@ -1,0 +1,461 @@
+---
+title: "Stawberries"
+author: MA615
+date: 2024 Sept 25
+format: html
+editor: visual
+---
+
+# Preparing data for analysis
+
+## Introduction: foundations
+
+Before we begin to work with the strawberry data, let's talk about how we will approach the work.
+
+### Data cleaning and organization
+
+Cleaning and organizing data for analysis is an essential skill for data scientists.
+Serious data analyses must be presented with the data on which the results depend. The credibility of data analysis and modelling depends on the care taken in data preparation and organization.
+
+#### References
+
+In their handbook ["An introduction to data cleaning with R" by Edwin de Jonge and Mark van der Loo](https://cran.r-project.org/doc/contrib/de_Jonge+van_der_Loo-Introduction_to_data_cleaning_with_R.pdf), de Jonge and van der Loo go into detail about specific data cleaning isssues and how to handle them in R.
+
+["Problems, Methods, and Challenges in Comprehensive Data Cleansing" by Heiko Müller and Johann-Christoph Freytag](https://www.researchgate.net/profile/Heiko-Mueller/publication/228929938_Problems_methods_and_challenges_in_comprehensive_data_cleansing/links/09e415101b58541e2c000000/Problems-methods-and-challenges-in-comprehensive-data-cleansing.pdf) is a good companion to the de Jonge and van der Loo handbook, offering additional issues in their discussion.
+
+### Attitudes
+
+Mechanistic descriptions of data cleaning methods are insufficient.
+
+#### Data is the product (or by-product) of purposeful human activity
+
+Much of the data used in analysis accessed on local databases or online which may create the impression that the data have been carefully curated. Beware. Data are produced by people for a purpose, with a point-of-view, and at a time and location that may affect the data. The provenance and lineage of the data are meta data you should include when reporting analysis. Data collection is purposeful human activity with all of the risks and weaknesses that are part of any purposeful human activity.
+
+#### Data is language
+
+Data has meaning. Data can be included in sentences related to the meaning of the data. Cleaning and organizing data should be informed by the meaning the data convey and how that meaning relates to the research you are doing do achieve this important result.
+
+-   Immerse yourself in the data. Put data into context.
+
+-   Visualize the data to find problems, confirm your understandings, and plan your data organization. People do a bad job of seeing meaningful patterns in data but a good job of seeing patterns of all kinds when data are rendered as plots. As you product and show visualizations, ask your self and those who view your presentations, "what do you see?" and "what do you wonder?"
+
+## Example: Strawberries
+
+### Public information
+
+[WHO says strawberries may not be so safe for you--2017March16](https://med.news.am/eng/news/13621/who-says-strawberries-may-not-be-so-safe-for-you.html)
+
+[Pesticides + poison gases = cheap, year-round strawberries 2019March20](https://www.ewg.org/foodnews/strawberries.php)
+
+[Multistate Outbreak of Hepatitis A Virus Infections Linked to Fresh Organic Strawberries-2022March5](https://www.cdc.gov/hepatitis/outbreaks/fresh-strawberries-2022/?CDC_AAref_Val=https://www.cdc.gov/hepatitis/outbreaks/2022/hav-contaminated-food/index.htm)
+
+[Strawberry makes list of cancer-fighting foods-2023May31](https://issuu.com/mechlocal/docs/053123_mech_asf/s/25386339)
+
+## What is the question?
+
+-   Where they are grown? By whom?
+
+-   Are they really loaded with carcinogenic poisons?
+
+-   Are they really good for your health?  Bad for your health?
+
+-   Are organic strawberries carriers of deadly diseases?
+
+-   When I go to the market should I buy conventional or organic strawberries?
+
+## The data
+
+The data set for this assignment has been selected from: \[[USDA_NASS_strawb_2024SEP25](https://quickstats.nass.usda.gov) <br> The data have been stored on NASS here: [USDA_NASS_strawb_2024SEP25](https://quickstats.nass.usda.gov/results/28141CE5-7429-36C3-A385-33ACC8030763)
+
+and has been stored on the blackboard as strawberries25_v3.csv.
+
+## USDA NASS
+
+```{r}
+#| label: load libraries
+#| warning: false
+#| message: false
+
+library(knitr)  
+library(kableExtra)
+library(tidyverse)
+library(stringr)
+```
+
+## Read the file
+
+```{r}
+#| label: read data - glimpse 
+
+strawberry <- read_csv("strawberries25_v3.csv", col_names = TRUE)
+
+glimpse(strawberry)
+```
+
+Examine the data. How is it organized?
+
+```{r}
+
+## is every line associated with a state?
+
+state_all <- strawberry |> distinct(State)
+
+state_all1 <- strawberry |> group_by(State) |> count()
+
+## every row is associated with a state
+
+sum(state_all1$n) == dim(strawberry)[1]
+
+
+## to get an idea of the data -- looking at california only
+
+calif_census <- strawberry |> filter((State=="CALIFORNIA") & (Program=="CENSUS"))
+
+calif_census <- calif_census |> select(Year, `Data Item`, Value)
+
+### 
+
+calif_survey <- strawberry |> filter((State=="CALIFORNIA") & (Program=="SURVEY"))
+
+calif_survey <- strawberry |> select(Year, Period, `Data Item`, Value)
+
+
+
+```
+
+## remove columns with a single value in all columns
+
+```{r}
+#|label: drop 1-item columns
+
+drop_one_value_col <- function(df){
+drop <- NULL
+for(i in 1:dim(df)[2]){
+if((df |> distinct(df[,i]) |> count()) == 1){
+drop = c(drop, i)
+} }
+
+if(is.null(drop)){return("none")}else{
+
+   print("Columns dropped:")
+   print(colnames(df)[drop])
+   strawberry <- df[, -1*drop]
+   }
+}
+
+
+## use the function
+
+strawberry <- drop_one_value_col(strawberry)
+
+drop_one_value_col(strawberry)
+
+```
+
+## separate composite columns
+
+### `Data Item` into (fruit, category, item)
+
+```{r}
+#|label: split Data Item
+
+  strawberry <- strawberry |>
+  separate_wider_delim(  cols = `Data Item`,
+                         delim = ",",
+                         names = c("Fruit",
+                                 "Category",
+                                 "Item",
+                                 "Metric"),
+                         too_many = "error",
+                         too_few = "align_start"
+                       )
+
+## Use too_many and too_few to set up the separation operation.
+
+```
+
+There is a problem you have to fix -- a leading space.
+
+```{r}
+#|label: fix the leading space
+
+ # note
+strawberry$Category[1]
+# strawberry$Item[2]
+# strawberry$Metric[6]
+# strawberry$Domain[1]
+## 
+## trim white space 
+
+strawberry$Category <- str_trim(strawberry$Category, side = "both")
+strawberry$Item <- str_trim(strawberry$Item, side = "both")
+strawberry$Metric <- str_trim(strawberry$Metric, side = "both")
+
+```
+
+## now exam the Fruit column -- find hidden sub-columns
+
+```{r}
+
+unique(strawberry$Fruit)
+
+## generate a list of rows with the production and price information
+
+spr <- which((strawberry$Fruit=="STRAWBERRIES - PRODUCTION") | (strawberry$Fruit=="STRAWBERRIES - PRICE RECEIVED"))
+
+
+strw_prod_price <- strawberry |> slice(spr)
+
+
+## this has the census data, too
+
+strw_chem <- strawberry |> slice(-1*spr)  ## too soon
+
+
+  
+```
+
+## now examine the rest of the columns
+
+Which ones need to be split?
+
+## split sales and chemicals into two dataframes
+
+(do this last after separating rows into separate data frames) (THEN rename the columns to correspond the analysis being done with the data frames)
+
+```{r}
+#|label: split srawberry into census and survey pieces
+
+strw_b_sales <- strawberry |> filter(Program == "CENSUS")
+
+strw_b_chem <- strawberry |> filter(Program == "SURVEY")
+
+nrow(strawberry) == (nrow(strw_b_chem) + nrow(strw_b_sales))
+
+## Move marketing-related rows in strw_b_chem 
+## to strw_b_sales
+
+
+
+
+```
+
+## plots
+
+```{r}
+#|label: plot 1
+
+plot1_data <- strawberry |> 
+  select(c(Year, State, Category, Value)) |> 
+  filter((Year == 2021) & (Category == "ORGANIC - OPERATIONS WITH SALES"))
+
+plot1_data$Value <- as.numeric(plot1_data$Value)
+
+plot1_data <- plot1_data |> arrange(desc(Value))
+
+ggplot(plot1_data, aes(x=reorder(State, -Value), y=Value)) + 
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x=element_text(angle=45,hjust=1)) +
+  labs(x = "States", y = "Count",
+title ="Number of Organic Strawberry operations with Sales in 2021")
+
+
+```
+
+```{r}
+## plot 2
+
+plot2_data <- strawberry |> 
+  select(c(Year, State, Category, Item, Value)) |> 
+  filter((Year == 2021) & 
+           (Category == "ORGANIC - SALES") & 
+           (Item == "MEASURED IN $") & 
+           (Value != "(D)"))
+
+
+plot2_data$Value <- as.numeric(gsub(",", "", plot2_data$Value))
+
+plot2_data <- plot1_data |> arrange(desc(Value))
+
+ggplot(plot2_data, aes(x=reorder(State, -Value), y=Value)) + 
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x=element_text(angle=45,hjust=1)) +
+  labs(x = "States", y = "Sales",
+title ="Organic Strawberry Sales ($) in 2021")
+
+
+```
+
+## chemicals
+
+### carcinogens from WHO list
+
+Six specific pesticides - captafol, ethylene dibromide, glyphosate, malathion, diazinon and dichlorophenyltrichloroethane (DDT)
+
+```{r}
+
+cc <- strawberry |> distinct(Category)
+
+cca <- strawberry |> 
+       distinct(Domain)
+
+## Split domain into two columns "type" and "subtype"
+  strawberry <- strawberry |>
+  separate_wider_delim(  cols = Domain,
+                         delim = ",",
+                         names = c("type",
+                                 "subtype"),
+                         too_many = "error",
+                         too_few = "align_start"
+                       )
+         
+## check the result
+    
+  ctype <- strawberry |> distinct(type)
+
+  
+  csubtype <- strawberry |> distinct(subtype)
+  
+## 
+  
+  
+  
+##  
+  
+  yr <- strawberry |> distinct(Year)
+  
+
+```
+
+```{r}
+## columns need descriptive names
+
+doc_cat <- strawberry |> distinct(`Domain Category`)
+
+strawberry <- strawberry |>
+  separate_wider_delim(  cols = `Domain Category`,
+                         delim = ",",
+                         names = c("type1",
+                                 "detail1",
+                                 "detail2",
+                                 "datail3"),
+                         too_many = "error",
+                         too_few = "align_start"
+                       )
+
+```
+
+```{r}
+## columns need descriptive names
+
+strawberry <- strawberry |>
+  separate_wider_delim(  cols = type1,
+                         delim = ":",
+                         names = c("type1a",
+                                 "type1b"),
+                         too_many = "error",
+                         too_few = "align_start"
+                       )
+
+
+```
+
+for EPA number lookup [epa numbers](https://archive.epa.gov/pesticides/chemicalsearch/chemical/foia/web/html/128810.html)
+
+[Active Pesticide Product Registration Informational Listing](https://ordspub.epa.gov/ords/pesticides/f?p=APPRIL_PUBLIC:2::::::)
+
+[CAS for Methyl Bromide](https://ordspub.epa.gov/ords/pesticides/f?p=113:17::::::)
+
+[pesticide chemical search](https://ordspub.epa.gov/ords/pesticides/f?p=chemicalsearch:1)
+
+[toxic chemical dashboard](https://comptox.epa.gov/dashboard/)
+
+[pubChem](https://pubchem.ncbi.nlm.nih.gov/)
+
+The EPA PC (Pesticide Chemical) Code is a unique chemical code number assigned by the EPA to a particular pesticide active ingredient, inert ingredient or mixture of active ingredients.
+
+```{r}
+
+# dat1 <- strawberry |> filter(type=="CHEMICAL")
+# 
+# dat2 <- strawberry |> filter(strawberry$type!=strawberry$type1a)
+# 
+#  
+# data_f21 <- strawberry |> 
+#   filter((subtype == " FUNGICIDE") & (State == "CALIFORNIA") & (Year == "2021")  )
+# 
+# data_f20 <- strawberry |> 
+#   filter((subtype == " FUNGICIDE") & (State == "CALIFORNIA") & (Year == "2020")  )
+# 
+# data_f19 <- strawberry |> 
+#   filter((subtype == " FUNGICIDE") & (State == "CALIFORNIA") & (Year == "2019")  )
+# 
+# data_f18 <- strawberry |> 
+#   filter((subtype == " FUNGICIDE") & (State == "CALIFORNIA") & (Year == "2018")  )
+# 
+# data_f17 <- strawberry |> 
+#   filter((subtype == " FUNGICIDE") & (State == "CALIFORNIA") & (Year == "2017")  )
+# 
+
+
+
+```
+
+```{r}
+## columns need descriptive names
+
+strawberry <- strawberry |>
+  separate_wider_delim(  cols = detail1,
+                         delim = ":",
+                         names = c("detail1a",
+                                 "detail1b"),
+                         too_many = "error",
+                         too_few = "align_start"
+                       )
+
+
+
+strawberry$detail1b <- strawberry$detail1b |> 
+  str_trim(side = "both") |> 
+     str_sub(start = 2, end = -2)
+
+
+aa <- strawberry$detail1b
+
+aa <- na.omit(aa)
+
+
+group1 <- c("captafol", "ethylene dibromide", 
+            "glyphosate","malathion", "diazinon", 
+            "dichlorophenyltrichloroethane", "DDT")
+
+
+```
+
+Investigating toxic pesticides
+
+[start here with chem PC code](https://ordspub.epa.gov/ords/pesticides/f?p=chemicalsearch:1)
+
+[step 2](https://ordspub.epa.gov/ords/pesticides/f?p=113:1::::RP,17,1::) to get label (with warnings) for products using the chemical
+
+[Pesticide Product and Label System](https://ordspub.epa.gov/ords/pesticides/f?p=113:1::::RP,17,1::)
+
+[Search by Chemical](https://ordspub.epa.gov/ords/pesticides/f?p=113:17::::::)
+
+[CompTox Chemicals Dashboard](https://comptox.epa.gov/dashboard/)
+
+[Active Pesticide Product Registration Informational Listing](https://ordspub.epa.gov/ords/pesticides/f?p=APPRIL_PUBLIC:2::::::)
+
+[OSHA chemical database](https://www.osha.gov/chemicaldata)
+
+[Pesticide Ingredients](http://npic.orst.edu/ingred/)
+
+[NPIC Product Research Online (NPRO)](http://npic.orst.edu/NPRO/)
+
+[Databases for Chemical Information](http://npic.orst.edu/ingred/cheminfo.html)
+
+[Pesticide Active Ingredients](http://npic.orst.edu/ingred/active.html)
+
+[TSCA Chemical Substance Inventory](https://www.epa.gov/tsca-inventory)
+
+[glyphosate](https://ordspub.epa.gov/ords/pesticides/f?p=CHEMICALSEARCH:3::::1,3,31,7,12,25:P3_XCHEMICAL_ID:2478)
