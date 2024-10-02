@@ -1,0 +1,148 @@
+---
+title: "Strawberries_Assignment"
+output: pdf_document
+date: "2024-10-02"
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Preparing data for analysis
+
+### Data cleaning and organization
+
+Cleaning and organizing data for analysis is an essential skill for data scientists. Serious data analyses must be presented with the data on which the results depend. The credibility of data analysis and modelling depends on the care taken in data preparation and organization.
+
+## USDA NASS
+
+```{r}
+#| label: load libraries
+#| warning: false
+#| message: false
+
+library(knitr)  
+library(kableExtra)
+library(tidyverse)
+library(stringr)
+```
+
+
+
+```{r}
+#| label: read data - glimpse 
+
+strawberry <- read_csv("strawberries25_v3.csv", col_names = TRUE)
+
+glimpse(strawberry)
+```
+
+```{r}
+
+## is every line associated with a state?
+
+state_all <- strawberry |> distinct(State)
+
+state_all1 <- strawberry |> group_by(State) |> count()
+
+## every row is associated with a state
+
+sum(state_all1$n) == dim(strawberry)[1]
+
+
+## to get an idea of the data -- looking at california only
+
+calif_census <- strawberry |> filter((State=="CALIFORNIA") & (Program=="CENSUS"))
+
+calif_census <- calif_census |> select(Year, `Data Item`, Value)
+
+### 
+
+calif_survey <- strawberry |> filter((State=="CALIFORNIA") & (Program=="SURVEY"))
+
+calif_survey <- strawberry |> select(Year, Period, `Data Item`, Value)
+
+
+```
+## remove columns with a single value in all columns
+
+```{r}
+#|label: drop 1-item columns
+
+drop_one_value_col <- function(df){
+drop <- NULL
+for(i in 1:dim(df)[2]){
+if((df |> distinct(df[,i]) |> count()) == 1){
+drop = c(drop, i)
+} }
+
+if(is.null(drop)){return("none")}else{
+
+   print("Columns dropped:")
+   print(colnames(df)[drop])
+   strawberry <- df[, -1*drop]
+   }
+}
+
+
+## use the function
+
+strawberry <- drop_one_value_col(strawberry)
+
+drop_one_value_col(strawberry)
+
+```
+
+## separate composite columns
+
+### `Data Item` into (fruit, category, item)
+
+```{r}
+#|label: split Data Item
+
+  strawberry <- strawberry |>
+  separate_wider_delim(  cols = `Data Item`,
+                         delim = ",",
+                         names = c("Fruit",
+                                 "Category",
+                                 "Item",
+                                 "Metric"),
+                         too_many = "error",
+                         too_few = "align_start"
+                       )
+
+## Use too_many and too_few to set up the separation operation.
+
+# Save the updated dataframe to a new CSV file
+
+
+#|label: fix the leading space
+
+ # note
+strawberry$Category[1]
+# strawberry$Item[2]
+# strawberry$Metric[6]
+# strawberry$Domain[1]
+## 
+## trim white space 
+
+strawberry$Category <- str_trim(strawberry$Category, side = "both")
+strawberry$Item <- str_trim(strawberry$Item, side = "both")
+strawberry$Metric <- str_trim(strawberry$Metric, side = "both")
+
+
+write.csv(strawberry, file = "strawberry_separated.csv", row.names = FALSE)
+```
+
+Using the code posted on Blackboard as a starting point, Create a document that explains how you cleaned, organized, and explored the strawberry data, preparing the data for analysis. Explain what you found. Consider using plots, tables, and drawings to make your description clear. Your code should be well-organized and annotated. Explain terms and units of measure that may not be familiar to the reader. Point out any inconsistencies and anomalies. List questions you have about the data.
+
+Your GitHub should contain your prepared document (pdf and qmd) and the ready-for-analysis data file. Deliver your document and the data as two separate files that can be read into R.
+
+In this assignment's next phase, we will provide more detail about the chemicals applied during strawberry cultivation. For the first phase (due next Monday) you should split chemical data into use, name, and code. For example, these two entries appear on one row in adjacent columns:
+
+CHEMICAL, FUNGICIDE CHEMICAL, FUNGICIDE: (BACILLUS SUBTILIS = 6479)
+
+After cleaning and organizing, this data should appear in three renamed columns as:
+
+FUNGICIDE, BACILLUS SUBTILIS, 6479.
