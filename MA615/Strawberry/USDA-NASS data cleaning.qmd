@@ -14,8 +14,7 @@ Before we begin to work with the strawberry data, let's talk about how we will a
 
 ### Data cleaning and organization
 
-Cleaning and organizing data for analysis is an essential skill for data scientists.
-Serious data analyses must be presented with the data on which the results depend. The credibility of data analysis and modelling depends on the care taken in data preparation and organization.
+Cleaning and organizing data for analysis is an essential skill for data scientists. Serious data analyses must be presented with the data on which the results depend. The credibility of data analysis and modelling depends on the care taken in data preparation and organization.
 
 #### References
 
@@ -57,7 +56,7 @@ Data has meaning. Data can be included in sentences related to the meaning of th
 
 -   Are they really loaded with carcinogenic poisons?
 
--   Are they really good for your health?  Bad for your health?
+-   Are they really good for your health? Bad for your health?
 
 -   Are organic strawberries carriers of deadly diseases?
 
@@ -211,8 +210,6 @@ strw_prod_price <- strawberry |> slice(spr)
 
 strw_chem <- strawberry |> slice(-1*spr)  ## too soon
 
-
-  
 ```
 
 ## now examine the rest of the columns

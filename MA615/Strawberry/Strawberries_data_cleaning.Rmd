@@ -133,7 +133,59 @@ strawberry$Metric <- str_trim(strawberry$Metric, side = "both")
 
 
 write.csv(strawberry, file = "strawberry_separated.csv", row.names = FALSE)
+
+#|label: fix the leading space
+
+ # note
+strawberry$Category[1]
+# strawberry$Item[2]
+# strawberry$Metric[6]
+# strawberry$Domain[1]
+## 
+## trim white space 
+
+strawberry$Category <- str_trim(strawberry$Category, side = "both")
+strawberry$Item <- str_trim(strawberry$Item, side = "both")
+strawberry$Metric <- str_trim(strawberry$Metric, side = "both")
+
+unique(strawberry$Fruit)
+
+## generate a list of rows with the production and price information
+
+spr <- which((strawberry$Fruit=="STRAWBERRIES - PRODUCTION") | (strawberry$Fruit=="STRAWBERRIES - PRICE RECEIVED"))
+
+
+strw_prod_price <- strawberry |> slice(spr)
+
+
+## this has the census data, too
+
+strw_chem <- strawberry |> slice(-1*spr)
+
+
+#|label: split srawberry into census and survey pieces
+
+strw_b_sales <- strawberry |> filter(Program == "CENSUS")
+
+strw_b_chem <- strawberry |> filter(Program == "SURVEY")
+
+nrow(strawberry) == (nrow(strw_b_chem) + nrow(strw_b_sales))
+
+## Move marketing-related rows in strw_b_chem 
+## to strw_b_sales
+
+
+write.csv(strawberry, file = "strawberry_separated.csv", row.names = FALSE)
+
 ```
+```{r}
+
+
+
+```
+
+
+
 
 Using the code posted on Blackboard as a starting point, Create a document that explains how you cleaned, organized, and explored the strawberry data, preparing the data for analysis. Explain what you found. Consider using plots, tables, and drawings to make your description clear. Your code should be well-organized and annotated. Explain terms and units of measure that may not be familiar to the reader. Point out any inconsistencies and anomalies. List questions you have about the data.
 
