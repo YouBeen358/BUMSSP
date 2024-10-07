@@ -1,23 +1,23 @@
 ---
 title: "Strawberries_Assignment"
-output: html_document
-always_allow_html: true
+output: 
+  pdf_document:
+    latex_engine: xelatex
+always_allow_html: false
 date: "2024-10-02"
 editor: visual
 ---
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Preparing data for analysis
-
-### Data cleaning and organization
-
+Preparing data for analysis
+Data cleaning and organization
 Cleaning and organizing data for analysis is an essential skill for data scientists. Serious data analyses must be presented with the data on which the results depend. The credibility of data analysis and modelling depends on the care taken in data preparation and organization.
 
-## USDA NASS
-
+USDA NASS
 ```{r}
 #| label: load libraries
 #| warning: false
@@ -27,14 +27,13 @@ library(knitr)
 library(kableExtra)
 library(tidyverse)
 library(stringr)
-```
 
-```{r}
 #| label: read data - glimpse 
 
 strawberry <- read_csv("strawberries25_v3.csv", col_names = TRUE)
 
 glimpse(strawberry)
+
 ```
 
 ```{r}
@@ -64,9 +63,7 @@ calif_survey <- strawberry |> select(Year, Period, `Data Item`, Value)
 
 
 ```
-
-## remove columns with a single value in all columns
-
+Remove columns with a single value in all rows
 ```{r}
 #|label: drop 1-item columns
 
@@ -92,12 +89,12 @@ strawberry <- drop_one_value_col(strawberry)
 
 drop_one_value_col(strawberry)
 
+
+
 ```
 
-## separate composite columns
-
-### `Data Item` into (fruit, category, item)
-
+Separate composite columns
+Split Data Item into (fruit, category, item)
 ```{r}
 #|label: split Data Item
 
@@ -116,7 +113,6 @@ drop_one_value_col(strawberry)
 
 # Save the updated dataframe to a new CSV file
 
-
 #|label: fix the leading space
 
  # note
@@ -130,54 +126,13 @@ strawberry$Category[1]
 strawberry$Category <- str_trim(strawberry$Category, side = "both")
 strawberry$Item <- str_trim(strawberry$Item, side = "both")
 strawberry$Metric <- str_trim(strawberry$Metric, side = "both")
-
-
-write.csv(strawberry, file = "strawberry_separated.csv", row.names = FALSE)
-
-#|label: fix the leading space
-
- # note
-strawberry$Category[1]
-# strawberry$Item[2]
-# strawberry$Metric[6]
-# strawberry$Domain[1]
-## 
-## trim white space 
-
-strawberry$Category <- str_trim(strawberry$Category, side = "both")
-strawberry$Item <- str_trim(strawberry$Item, side = "both")
-strawberry$Metric <- str_trim(strawberry$Metric, side = "both")
-
-unique(strawberry$Fruit)
-
-## generate a list of rows with the production and price information
-
-spr <- which((strawberry$Fruit=="STRAWBERRIES - PRODUCTION") | (strawberry$Fruit=="STRAWBERRIES - PRICE RECEIVED"))
-
-
-strw_prod_price <- strawberry |> slice(spr)
-
-
-## this has the census data, too
-
-strw_chem <- strawberry |> slice(-1*spr)
-
-
-#|label: split srawberry into census and survey pieces
-
-strw_b_sales <- strawberry |> filter(Program == "CENSUS")
-
-strw_b_chem <- strawberry |> filter(Program == "SURVEY")
-
-nrow(strawberry) == (nrow(strw_b_chem) + nrow(strw_b_sales))
-
-## Move marketing-related rows in strw_b_chem 
-## to strw_b_sales
 
 
 write.csv(strawberry, file = "strawberry_separated.csv", row.names = FALSE)
 
 ```
+
+Further processing and cleaning
 
 ```{r}
 # Load required libraries
@@ -215,30 +170,27 @@ write_csv(strawberry_clean, "strawberry_separated_clean.csv")
 # Output to verify the cleaned data
 print(strawberry_clean)
 
+
+
 ```
 
+Display the cleaned data in a table
 ```{r}
 # Display the first few rows of the cleaned data as a table
-knitr::kable(head(strawberry_clean), format = "html") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
-
-
+knitr::kable(head(strawberry_clean), format = "latex", booktabs = TRUE)
 ```
 
+PLOTS
 ```{r}
 # Bar plot of chemical use types (FUNGICIDE, INSECTICIDE, etc.)
 ggplot(strawberry_clean, aes(x = Use)) +
   geom_bar(fill = "skyblue") +
   labs(title = "Distribution of Chemical Uses", x = "Chemical Use", y = "Count") +
   theme_minimal()
-
 ```
+From the graph above, we see that Fungicide and Insecticide are the most commonly used chemicals. They both have a high count of approximately 1000 observations, while Herbicide has a significantly lower count with fewer than 500 observations.
 
-From the graph above, we see that Fungicide and Insecticide are the most commonly used chemicals. They both have a high count of $1000$ observations. However, the Herbicide has a significantly lower count with less than $500$.
-
-From this outcome, we can assume that Fungicide and Insecticide are commonly used in the strawberry growing process events.
-
-From this, we could investigate the reasons as of why herbicdes are used less, or explore trends on how the usage of three have changed in the recent years.
+This suggests that Fungicide and Insecticide are commonly used in strawberry cultivation, and further investigation could explore why herbicides are used less frequently or how the use of these chemicals has changed over time.
 
 ```{r}
 # Plot the number of chemical applications (grouped by 'Use') across different measurement types
@@ -246,22 +198,18 @@ ggplot(strawberry_clean, aes(x = Use, fill = Fruit)) +
   geom_bar(position = "dodge") +
   labs(title = "Chemical Applications by Type", x = "Chemical Use", y = "Count", fill = "Fruit") +
   theme_minimal()
-
 ```
-
-From the graph above, we notice that Strawberries - applications and strawberries - treated are both contributing minimally accross the chemical types. These may show that there are different chemicals or specialized treatment methods for crop treatments.
+From this graph, we see that most applications are associated with strawberries, but we also see some minimal contributions from other categories (applications and treated).
 
 ```{r}
-# Load the necessary libraries
-library(tidyverse)
-
-# Assuming 'strawberry_clean' is the cleaned dataset with 'Year', 'Code', and 'Use' columns
+# Scatter plot of chemical code distribution by year
 ggplot(strawberry_clean, aes(x = Year, y = as.numeric(Code), color = Use)) +
   geom_point() +
   labs(title = "Chemical Code Distribution by Year", x = "Year", y = "Chemical Code") +
   scale_y_continuous(labels = scales::comma) +  # This will format the y-axis with commas instead of scientific notation
   theme_minimal()
-
 ```
+This scatter plot shows a stable trend in the use of chemical codes over the years. The usage of Fungicide and Insecticide has remained consistent, with no noticeable large fluctuations. However, data points for certain years like 2020 and 2022 seem to be missing. Further investigation could explore the reasons behind this or whether other similar data can fill in the gaps.
 
-This scatter plot shows a stable chemical trend along the years. The amount of Funficide and Insecticide used are pretty stable, and has similar trends. This means that the strawberry farm has stayed consistent with their way of using chemicals. However, the data points for 2020 as well as 2022 is missing. We could track down on the reasons, or see if there could be any other data in similar format to fill out.
+Conclusion
+Through cleaning, organizing, and visualizing the strawberry dataset, we have identified the predominant chemical types used in strawberry production and explored their trends over the years. This analysis provides a foundation for future exploration, including the reasons behind missing data points and the difference in chemical use across different periods and treatments.
