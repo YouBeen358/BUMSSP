@@ -8,16 +8,14 @@ date: "2024-10-02"
 editor: visual
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Preparing data for analysis
-Data cleaning and organization
-Cleaning and organizing data for analysis is an essential skill for data scientists. Serious data analyses must be presented with the data on which the results depend. The credibility of data analysis and modelling depends on the care taken in data preparation and organization.
+Preparing data for analysis Data cleaning and organization Cleaning and organizing data for analysis is an essential skill for data scientists. Serious data analyses must be presented with the data on which the results depend. The credibility of data analysis and modelling depends on the care taken in data preparation and organization.
 
 USDA NASS
+
 ```{r}
 #| label: load libraries
 #| warning: false
@@ -35,7 +33,8 @@ strawberry <- read_csv("strawberries25_v3.csv", col_names = TRUE)
 glimpse(strawberry)
 
 ```
-
+From the data, we can see that there are 12,669 rows with 21 columns. 
+Some variables are not available, and hence will nedd some modification. 
 ```{r}
 
 ## is every line associated with a state?
@@ -63,7 +62,9 @@ calif_survey <- strawberry |> select(Year, Period, `Data Item`, Value)
 
 
 ```
+
 Remove columns with a single value in all rows
+
 ```{r}
 #|label: drop 1-item columns
 
@@ -93,8 +94,8 @@ drop_one_value_col(strawberry)
 
 ```
 
-Separate composite columns
-Split Data Item into (fruit, category, item)
+Separate composite columns Split Data Item into (fruit, category, item)
+
 ```{r}
 #|label: split Data Item
 
@@ -175,12 +176,14 @@ print(strawberry_clean)
 ```
 
 Display the cleaned data in a table
+
 ```{r}
 # Display the first few rows of the cleaned data as a table
 knitr::kable(head(strawberry_clean), format = "latex", booktabs = TRUE)
 ```
 
 PLOTS
+
 ```{r}
 # Bar plot of chemical use types (FUNGICIDE, INSECTICIDE, etc.)
 ggplot(strawberry_clean, aes(x = Use)) +
@@ -188,6 +191,7 @@ ggplot(strawberry_clean, aes(x = Use)) +
   labs(title = "Distribution of Chemical Uses", x = "Chemical Use", y = "Count") +
   theme_minimal()
 ```
+
 From the graph above, we see that Fungicide and Insecticide are the most commonly used chemicals. They both have a high count of approximately 1000 observations, while Herbicide has a significantly lower count with fewer than 500 observations.
 
 This suggests that Fungicide and Insecticide are commonly used in strawberry cultivation, and further investigation could explore why herbicides are used less frequently or how the use of these chemicals has changed over time.
@@ -199,6 +203,7 @@ ggplot(strawberry_clean, aes(x = Use, fill = Fruit)) +
   labs(title = "Chemical Applications by Type", x = "Chemical Use", y = "Count", fill = "Fruit") +
   theme_minimal()
 ```
+
 From this graph, we see that most applications are associated with strawberries, but we also see some minimal contributions from other categories (applications and treated).
 
 ```{r}
@@ -209,7 +214,110 @@ ggplot(strawberry_clean, aes(x = Year, y = as.numeric(Code), color = Use)) +
   scale_y_continuous(labels = scales::comma) +  # This will format the y-axis with commas instead of scientific notation
   theme_minimal()
 ```
+
 This scatter plot shows a stable trend in the use of chemical codes over the years. The usage of Fungicide and Insecticide has remained consistent, with no noticeable large fluctuations. However, data points for certain years like 2020 and 2022 seem to be missing. Further investigation could explore the reasons behind this or whether other similar data can fill in the gaps.
 
-Conclusion
-Through cleaning, organizing, and visualizing the strawberry dataset, we have identified the predominant chemical types used in strawberry production and explored their trends over the years. This analysis provides a foundation for future exploration, including the reasons behind missing data points and the difference in chemical use across different periods and treatments.
+Conclusion Through cleaning, organizing, and visualizing the strawberry dataset, we have identified the predominant chemical types used in strawberry production and explored their trends over the years. This analysis provides a foundation for future exploration, including the reasons behind missing data points and the difference in chemical use across different periods and treatments.
+
+
+```{r}
+# Load the required libraries
+library(tidyverse)
+
+# Step 1: Read the original strawberries dataset
+strawberries_orig <- read_csv("strawberries25_v3.csv")
+
+# Step 2: Filter for Organic Strawberries
+organic_strawberry <- strawberries_orig %>%
+  filter(str_detect(`Data Item`, "ORGANIC"))
+
+# Step 3: Save the filtered organic strawberries data to a new CSV file
+write_csv(organic_strawberry, "organic_strawberries.csv")
+
+# Optional: Print the first few rows to verify the data
+print(head(organic_strawberry))
+
+
+
+```
+```{r}
+# Load the required libraries
+library(tidyverse)
+library(stringr)
+
+# Step 1: Read the original strawberries dataset
+strawberries_orig <- read_csv("strawberries25_v3.csv")
+
+# Step 2: Filter for Organic Strawberries
+organic_strawberry <- strawberries_orig %>%
+  filter(str_detect(`Data Item`, "ORGANIC"))
+
+# Step 3: Remove columns with a single value in all rows
+drop_one_value_col <- function(df) {
+  drop <- NULL
+  for (i in 1:ncol(df)) {
+    if (n_distinct(df[[i]]) == 1) {
+      drop <- c(drop, i)
+    }
+  }
+  
+  if (is.null(drop)) {
+    return(df)  # Return the original dataframe if no columns are dropped
+  } else {
+    print("Columns dropped:")
+    print(colnames(df)[drop])
+    df <- df[, -drop]  # Remove columns with only a single value
+    return(df)
+  }
+}
+
+# Apply the function to drop columns with a single value
+organic_strawberry <- drop_one_value_col(organic_strawberry)
+
+# Step 4: Split composite columns (e.g., "Data Item")
+# Use a more flexible splitting approach to handle inconsistencies
+organic_strawberry <- organic_strawberry %>%
+  separate(`Data Item`, into = c("Fruit", "Category", "Item", "Metric"), sep = ",", extra = "merge", fill = "right")
+
+# Step 5: Clean up leading/trailing spaces in the new columns
+organic_strawberry <- organic_strawberry %>%
+  mutate(across(c(Category, Item, Metric), ~ str_trim(., side = "both")))
+
+# Step 6: Handle non-numeric values in the 'Value' column
+# Convert non-numeric entries like (D), (H) to NA and remove commas
+organic_strawberry <- organic_strawberry %>%
+  mutate(Value = as.numeric(str_replace_all(Value, "[^0-9]", NA_character_)))
+
+# Step 7: Save the cleaned organic strawberries data to a new CSV file
+write_csv(organic_strawberry, "organic_strawberries_cleaned.csv")
+
+# Step 8: Display a sample of the cleaned data for verification
+print(head(organic_strawberry))
+
+# Optional: Check the summary to verify that the 'Value' column is numeric and other columns are correct
+summary(organic_strawberry)
+
+```
+```{r}
+# Load required library
+library(ggplot2)
+
+# Step 1: Filter the data to make sure you focus on relevant rows (e.g., exclude rows with NA in Value)
+organic_strawberry_state <- organic_strawberry %>%
+  filter(!is.na(Value), !is.na(State))  # Ensure Value and State are not NA
+
+# Step 2: Plot the bar graph of Value by State
+ggplot(organic_strawberry_state, aes(x = State, y = Value)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  labs(title = "Organic Strawberry Values by State",
+       x = "State", 
+       y = "Value") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for clarity
+
+```
+
+
+I collected the organic strawberry data from the dataset and cleaned it as I would do in the previous dataset. I then looked at what states produce the most amount of organic strawberries. 
+
+
