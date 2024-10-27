@@ -62,7 +62,7 @@ library(magrittr)
 #| label: read data - glimpse 
 #| echo: false
 
-strawberry <- read_csv("strawberries25_v3.csv", col_names = TRUE, show_col_types = FALSE )
+strawberry <- read_csv("strawberries25_v.csv", col_names = TRUE, show_col_types = FALSE )
 
 ## glimpse(strawberry)
 ```
