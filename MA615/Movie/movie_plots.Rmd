@@ -1,0 +1,122 @@
+---
+title: "Movie Topic Modeling"
+author: "Your Name"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(tm)
+library(topicmodels)
+library(ldatuning)
+library(wordcloud)
+
+movie_plots <- read_csv("movie_plots.csv")
+movie_plots_with_genres <- read_csv("movie_plots_with_genres.csv")
+
+# Test on a subset
+test_subset <- movie_plots[1:100, ]  # First 100 rows
+test_corpus <- Corpus(VectorSource(test_subset$Plot))
+# Apply preprocessing on the smaller subset
+
+
+library(tm)
+
+library(SnowballC)
+
+# Preprocess the text
+corpus <- Corpus(VectorSource(movie_plots$Plot))
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+corpus <- tm_map(corpus, stripWhitespace)
+corpus <- tm_map(corpus, stemDocument)  # Optional: apply stemming
+
+# Create a DTM
+dtm <- DocumentTermMatrix(corpus)
+
+# Check sparsity and remove sparse terms
+dtm <- removeSparseTerms(dtm, 0.98)  # Adjust sparsity as needed
+
+
+```
+```{r}
+library(ldatuning)
+
+result <- FindTopicsNumber(
+  dtm,
+  topics = seq(2, 20, by = 1),
+  metrics = c("Griffiths2004", "CaoJuan2009", "Arun2010", "Deveaud2014"),
+  method = "Gibbs",
+  control = list(seed = 1234),
+  verbose = TRUE
+)
+
+FindTopicsNumber_plot(result)
+
+
+```
+
+
+```{r}
+k <- 5  # Replace with the chosen number of topics
+lda_model <- LDA(dtm, k = k, method = "Gibbs", control = list(seed = 1234))
+
+library(tidytext)
+
+gamma <- tidy(lda_model, matrix = "gamma")
+ggplot(gamma, aes(topic, gamma)) +
+  geom_boxplot() +
+  labs(title = "Document-Topic Distribution", x = "Topics", y = "Gamma")
+
+```
+
+```{r}
+
+beta <- tidy(lda_model, matrix = "beta")
+top_terms <- beta %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 10) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+ggplot(top_terms, aes(reorder_within(term, beta, topic), beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  labs(title = "Top Terms by Topic", x = NULL, y = "Beta")
+
+doc_topics <- topics(lda_model)
+doc_topics_df <- data.frame(doc_id = 1:length(doc_topics), topic = doc_topics)
+
+ggplot(doc_topics_df, aes(x = doc_id, y = topic)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.5) +
+  labs(title = "Document Clustering by Topic", x = "Document ID", y = "Topic")
+
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+# Code to create the word cloud
+wordcloud(terms, min.freq = 1, max.words = 100, random.order = FALSE)
+
+
+for (i in 1:k) {
+  terms <- beta %>%
+    filter(topic == i) %>%
+    arrange(desc(beta)) %>%
+    pull(term)
+
+  wordcloud(terms, min.freq = 1, max.words = 100, random.order = FALSE, colors = brewer.pal(8, "Dark2"))
+}
+
+
+```
