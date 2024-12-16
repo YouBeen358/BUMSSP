@@ -1,0 +1,14 @@
+---
+title: "Weather file Cleaning"
+author: "You Been Park"
+date: "2024-12-13"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+D
+          "predicted_temperature_2025.csv", row.names = FALSE)
+```

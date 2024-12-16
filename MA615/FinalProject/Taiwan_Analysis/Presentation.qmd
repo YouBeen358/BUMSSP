@@ -1,0 +1,56 @@
+---
+title: "Taiwan Analysis"
+format: revealjs
+editor: visual
+---
+
+# Overview
+
+-   **Government**: Semi-presidential democracy.
+-   **Economy**: A global leader in technology and electronics manufacturing.
+-   **Population**: Approximately 23.59 million people as of 2023.
+-   **Natural Environment**: Known for its mountains, forests, and diverse ecosystems.
+-   **History**: Rich history including periods of Dutch, Spanish, and Japanese colonization.
+
+------------------------------------------------------------------------
+
+# Map of Taiwan
+
+```{r}
+library(leaflet)
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  setView(lng = 121.5598, lat = 25.0911, zoom = 7) %>%
+  addMarkers(lng = 121.5598, lat = 25.0911, popup = "Taipei")
+```
+------------------------------------------------------------------------
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+gdp_metrics <- data.frame(
+  Metric = c("GDP (2020)", "GDP (2021)", "GDP (2022)", "GDP (2023)"),
+  Taiwan = c(668159000000, 722589000000, 759104000000, 755674000000),
+  Singapore = c(349488382611, 434111559283, 498474540988, 501427500080)
+)
+gdp_long <- gdp_metrics %>%
+  pivot_longer(cols = Taiwan:Singapore, names_to = "Country", values_to = "GDP")
+
+ggplot(gdp_long, aes(x = Metric, y = GDP / 1e12, fill = Country)) +
+  geom_col(position = "dodge") +
+  labs(title = "GDP Comparison (Taiwan vs. Singapore)", y = "GDP (Trillion USD)", x = "Year") +
+  theme_minimal()
+```
+------------------------------------------------------------------------
+```{r}
+library(forecast)
+# Simulated data for projections
+monthly_ts <- ts(runif(60, min = 15, max = 30), start = c(2020, 1), frequency = 12)
+forecast_2025 <- forecast(auto.arima(monthly_ts), h = 12)
+
+autoplot(forecast_2025) +
+  labs(title = "Temperature Projection (2025)", x = "Month", y = "Temperature (°C)") +
+  theme_minimal()
+```
+
+------------------------------------------------------------------------
